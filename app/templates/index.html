@@ -1,0 +1,212 @@
+<!doctype html>
+<html>
+    <head>
+        <meta charset="UTF-8" />
+        <title>Mic Waveform</title>
+        <style>
+            body {
+                background: #f9f9f9;
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                min-height: 100vh;
+                font-family: sans-serif;
+                text-align: center;
+            }
+
+            button {
+                margin: 5px;
+                padding: 10px 20px;
+                font-size: 16px;
+                border: none;
+                border-radius: 5px;
+                cursor: pointer;
+            }
+
+            #startBtn {
+                background-color: #4caf50;
+                color: white;
+            }
+
+            #stopBtn {
+                background-color: #f44336;
+                color: white;
+            }
+
+            #waveform {
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100vw;
+                height: 100vh;
+                z-index: -1;
+                background: white;
+                opacity: 0.4;
+            }
+            #transcriptContainer {
+                max-width: 80%;
+                margin-top: 20px;
+                padding: 15px;
+                background: #fff;
+                font-size: 2rem; /* much bigger */
+                line-height: 1.5;
+                color: #333;
+                text-align: left;
+            }
+        </style>
+    </head>
+    <body>
+        <canvas id="waveform"></canvas>
+        <h1>Microphone Streaming with Waveform</h1>
+        <p id="status">Click "Start" to begin</p>
+
+        <div>
+            <button id="startBtn">Start</button>
+            <button id="stopBtn" disabled>Stop</button>
+        </div>
+
+        <div id="transcriptContainer">
+            <div id="transcript"></div>
+        </div>
+
+        <!-- {{ request }} -->
+
+        <script>
+            const status = document.getElementById("status");
+            const canvas = document.getElementById("waveform");
+            const ctx = canvas.getContext("2d");
+
+            const startBtn = document.getElementById("startBtn");
+            const stopBtn = document.getElementById("stopBtn");
+
+            let socket;
+            let audioCtx;
+            let processor;
+            let audioStream;
+            let analyser;
+            let dataArray;
+            let animationId;
+
+            function drawWaveform() {
+                function draw() {
+                    animationId = requestAnimationFrame(draw);
+                    analyser.getByteTimeDomainData(dataArray);
+
+                    ctx.fillStyle = "white";
+                    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+                    ctx.lineWidth = 2;
+                    ctx.strokeStyle = "purple";
+                    ctx.beginPath();
+
+                    const sliceWidth = canvas.width / dataArray.length;
+                    let x = 0;
+
+                    for (let i = 0; i < dataArray.length; i++) {
+                        const v = dataArray[i] / 128.0;
+                        const y = (v * canvas.height) / 2;
+                        if (i === 0) ctx.moveTo(x, y);
+                        else ctx.lineTo(x, y);
+                        x += sliceWidth;
+                    }
+
+                    ctx.lineTo(canvas.width, canvas.height / 2);
+                    ctx.stroke();
+                }
+
+                draw();
+            }
+
+            function floatTo16BitPCM(float32Array) {
+                const buffer = new ArrayBuffer(float32Array.length * 2);
+                const view = new DataView(buffer);
+                for (let i = 0; i < float32Array.length; i++) {
+                    let s = Math.max(-1, Math.min(1, float32Array[i]));
+                    view.setInt16(i * 2, s < 0 ? s * 0x8000 : s * 0x7fff, true);
+                }
+                return buffer;
+            }
+
+            startBtn.onclick = async () => {
+                status.textContent = "Connecting...";
+                socket = new WebSocket(
+                    "ws://" + window.location.host + "/ws/audio",
+                );
+
+                socket.onopen = async () => {
+                    status.textContent =
+                        "WebSocket connected. Requesting microphone...";
+                    try {
+                        audioStream = await navigator.mediaDevices.getUserMedia(
+                            { audio: true },
+                        );
+
+                        audioCtx = new AudioContext({ sampleRate: 16000 });
+                        const source =
+                            audioCtx.createMediaStreamSource(audioStream);
+
+                        // FFT visualization
+                        analyser = audioCtx.createAnalyser();
+                        analyser.fftSize = 2048;
+                        const bufferLength = analyser.fftSize;
+                        dataArray = new Uint8Array(bufferLength);
+                        source.connect(analyser);
+                        drawWaveform();
+
+                        // Create script processor for PCM audio
+                        processor = audioCtx.createScriptProcessor(4096, 1, 1);
+                        source.connect(processor);
+                        processor.connect(audioCtx.destination);
+
+                        processor.onaudioprocess = (event) => {
+                            const input = event.inputBuffer.getChannelData(0);
+                            const pcm = floatTo16BitPCM(input);
+                            if (socket.readyState === WebSocket.OPEN) {
+                                socket.send(pcm);
+                            }
+                        };
+
+                        startBtn.disabled = true;
+                        stopBtn.disabled = false;
+                        status.textContent =
+                            "Recording, streaming, and visualizing...";
+                    } catch (err) {
+                        status.textContent =
+                            "Mic access failed: " + err.message;
+                    }
+                };
+
+                socket.onerror = (err) => {
+                    status.textContent = "WebSocket error: " + err.message;
+                };
+
+                socket.onmessage = (event) => {
+                    console.log("Transcription:", event.data);
+                    // status.textContent = event.data;
+                    const transcriptEl = document.getElementById("transcript");
+                    if (event.data && !event.data.startsWith("[error")) {
+                        transcriptEl.textContent += " " + event.data;
+                    }
+                };
+
+                socket.onclose = () => {
+                    status.textContent = "WebSocket disconnected";
+                };
+            };
+
+            stopBtn.onclick = () => {
+                if (processor) processor.disconnect();
+                if (audioCtx) audioCtx.close();
+                if (audioStream)
+                    audioStream.getTracks().forEach((track) => track.stop());
+                if (socket && socket.readyState === WebSocket.OPEN)
+                    socket.close();
+                if (animationId) cancelAnimationFrame(animationId);
+
+                startBtn.disabled = false;
+                stopBtn.disabled = true;
+                status.textContent = "Stopped";
+            };
+        </script>
+    </body>
+</html>
