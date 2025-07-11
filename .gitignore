@@ -10,3 +10,5 @@ wheels/
 .venv
 .dist
 .DS_Store
+.env
+CLAUDE.md

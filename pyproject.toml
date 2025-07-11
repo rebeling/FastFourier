@@ -4,4 +4,11 @@ version = "0.1.0"
 description = "Stream mic speech to text."
 readme = "README.md"
 requires-python = ">=3.11"
-dependencies = []
+dependencies = [
+    "fastapi>=0.115.12",
+    "jinja2>=3.1.6",
+    "openai-whisper>=20250625",
+    "pydantic-ai>=0.1.0",
+    "python-decouple>=3.8",
+    "python-dotenv>=1.0.0",
+]

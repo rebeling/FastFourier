@@ -1,212 +1,111 @@
 <!doctype html>
-<html>
+<html lang="en">
     <head>
         <meta charset="UTF-8" />
-        <title>Mic Waveform</title>
-        <style>
-            body {
-                background: #f9f9f9;
-                display: flex;
-                flex-direction: column;
-                align-items: center;
-                min-height: 100vh;
-                font-family: sans-serif;
-                text-align: center;
-            }
-
-            button {
-                margin: 5px;
-                padding: 10px 20px;
-                font-size: 16px;
-                border: none;
-                border-radius: 5px;
-                cursor: pointer;
-            }
-
-            #startBtn {
-                background-color: #4caf50;
-                color: white;
-            }
-
-            #stopBtn {
-                background-color: #f44336;
-                color: white;
-            }
-
-            #waveform {
-                position: fixed;
-                top: 0;
-                left: 0;
-                width: 100vw;
-                height: 100vh;
-                z-index: -1;
-                background: white;
-                opacity: 0.4;
-            }
-            #transcriptContainer {
-                max-width: 80%;
-                margin-top: 20px;
-                padding: 15px;
-                background: #fff;
-                font-size: 2rem; /* much bigger */
-                line-height: 1.5;
-                color: #333;
-                text-align: left;
-            }
-        </style>
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Interview Trainer</title>
+        <script src="https://cdn.tailwindcss.com"></script>
+        <link rel="stylesheet" href="/static/assets/style.css" />
+        <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     </head>
-    <body>
-        <canvas id="waveform"></canvas>
-        <h1>Microphone Streaming with Waveform</h1>
-        <p id="status">Click "Start" to begin</p>
-
-        <div>
-            <button id="startBtn">Start</button>
-            <button id="stopBtn" disabled>Stop</button>
+    <body class="bg-gray-100 text-gray-800">
+        <div
+            id="initial-view"
+            class="container mx-auto min-h-screen flex flex-col items-center justify-start"
+            style="padding-top: 20vh"
+        >
+            <h1 class="text-6xl font-bold mb-8">Interview Trainer</h1>
+            <div class="bg-white p-8 rounded-lg shadow-md w-full max-w-md">
+                <h2 class="text-2xl font-bold mb-4 text-center">Setup</h2>
+                <form id="interviewForm">
+                    <div class="mb-4">
+                        <label
+                            for="job_title"
+                            class="block text-sm font-medium text-gray-700"
+                            >Job Title</label
+                        >
+                        <input
+                            type="text"
+                            id="job_title"
+                            name="job_title"
+                            value="Senior Software Engineer"
+                            required
+                            class="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                        />
+                    </div>
+                    <div class="mb-6">
+                        <label
+                            for="topic"
+                            class="block text-sm font-medium text-gray-700"
+                            >Topic (optional)</label
+                        >
+                        <input
+                            type="text"
+                            id="topic"
+                            name="topic"
+                            value="Python"
+                            class="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                        />
+                    </div>
+                    <button
+                        type="submit"
+                        class="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                    >
+                        Start
+                    </button>
+                </form>
+            </div>
         </div>
 
-        <div id="transcriptContainer">
-            <div id="transcript"></div>
+        <div
+            id="interview-container"
+            class="container mx-auto p-4"
+            style="display: none; max-width: 800px"
+        >
+            <h1 class="text-4xl font-bold text-center mb-8 opacity-10">
+                Interview Trainer
+            </h1>
+
+            <div class="bg-white p-6 rounded-lg shadow-md mb-8">
+                <h2 class="text-xl font-bold mb-2">Question:</h2>
+                <div id="question-loading" class="flex items-center justify-center py-4" style="display: none;">
+                    <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
+                    <span class="ml-3 text-gray-600">Loading question...</span>
+                </div>
+                <p id="question" class="text-lg"></p>
+            </div>
+
+            <div class="text-center my-8">
+                <p id="status" class="text-lg mb-4">
+                    Click the button to start recording.
+                </p>
+                <button id="recordBtn" class="mx-auto">
+                    <canvas id="button-waveform"></canvas>
+                    <span id="recordBtnText">Start<br />Recording</span>
+                </button>
+            </div>
+
+            <div id="results-container" class="space-y-8" style="display: none">
+                <div class="bg-white p-6 rounded-lg shadow-md">
+                    <h2 class="text-xl font-bold mb-2">Your Answer:</h2>
+                    <div id="transcript" class="prose max-w-none"></div>
+                </div>
+
+                <div class="bg-white p-6 rounded-lg shadow-md">
+                    <h2 class="text-xl font-bold mb-2">Feedback:</h2>
+                    <div id="feedback" class="prose max-w-none"></div>
+                </div>
+                <div class="text-center">
+                    <button
+                        id="nextQuestionBtn"
+                        class="py-3 px-6 border border-transparent rounded-md shadow-sm text-lg font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                    >
+                        Next Question
+                    </button>
+                </div>
+            </div>
         </div>
 
-        <!-- {{ request }} -->
-
-        <script>
-            const status = document.getElementById("status");
-            const canvas = document.getElementById("waveform");
-            const ctx = canvas.getContext("2d");
-
-            const startBtn = document.getElementById("startBtn");
-            const stopBtn = document.getElementById("stopBtn");
-
-            let socket;
-            let audioCtx;
-            let processor;
-            let audioStream;
-            let analyser;
-            let dataArray;
-            let animationId;
-
-            function drawWaveform() {
-                function draw() {
-                    animationId = requestAnimationFrame(draw);
-                    analyser.getByteTimeDomainData(dataArray);
-
-                    ctx.fillStyle = "white";
-                    ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-                    ctx.lineWidth = 2;
-                    ctx.strokeStyle = "purple";
-                    ctx.beginPath();
-
-                    const sliceWidth = canvas.width / dataArray.length;
-                    let x = 0;
-
-                    for (let i = 0; i < dataArray.length; i++) {
-                        const v = dataArray[i] / 128.0;
-                        const y = (v * canvas.height) / 2;
-                        if (i === 0) ctx.moveTo(x, y);
-                        else ctx.lineTo(x, y);
-                        x += sliceWidth;
-                    }
-
-                    ctx.lineTo(canvas.width, canvas.height / 2);
-                    ctx.stroke();
-                }
-
-                draw();
-            }
-
-            function floatTo16BitPCM(float32Array) {
-                const buffer = new ArrayBuffer(float32Array.length * 2);
-                const view = new DataView(buffer);
-                for (let i = 0; i < float32Array.length; i++) {
-                    let s = Math.max(-1, Math.min(1, float32Array[i]));
-                    view.setInt16(i * 2, s < 0 ? s * 0x8000 : s * 0x7fff, true);
-                }
-                return buffer;
-            }
-
-            startBtn.onclick = async () => {
-                status.textContent = "Connecting...";
-                socket = new WebSocket(
-                    "ws://" + window.location.host + "/ws/audio",
-                );
-
-                socket.onopen = async () => {
-                    status.textContent =
-                        "WebSocket connected. Requesting microphone...";
-                    try {
-                        audioStream = await navigator.mediaDevices.getUserMedia(
-                            { audio: true },
-                        );
-
-                        audioCtx = new AudioContext({ sampleRate: 16000 });
-                        const source =
-                            audioCtx.createMediaStreamSource(audioStream);
-
-                        // FFT visualization
-                        analyser = audioCtx.createAnalyser();
-                        analyser.fftSize = 2048;
-                        const bufferLength = analyser.fftSize;
-                        dataArray = new Uint8Array(bufferLength);
-                        source.connect(analyser);
-                        drawWaveform();
-
-                        // Create script processor for PCM audio
-                        processor = audioCtx.createScriptProcessor(4096, 1, 1);
-                        source.connect(processor);
-                        processor.connect(audioCtx.destination);
-
-                        processor.onaudioprocess = (event) => {
-                            const input = event.inputBuffer.getChannelData(0);
-                            const pcm = floatTo16BitPCM(input);
-                            if (socket.readyState === WebSocket.OPEN) {
-                                socket.send(pcm);
-                            }
-                        };
-
-                        startBtn.disabled = true;
-                        stopBtn.disabled = false;
-                        status.textContent =
-                            "Recording, streaming, and visualizing...";
-                    } catch (err) {
-                        status.textContent =
-                            "Mic access failed: " + err.message;
-                    }
-                };
-
-                socket.onerror = (err) => {
-                    status.textContent = "WebSocket error: " + err.message;
-                };
-
-                socket.onmessage = (event) => {
-                    console.log("Transcription:", event.data);
-                    // status.textContent = event.data;
-                    const transcriptEl = document.getElementById("transcript");
-                    if (event.data && !event.data.startsWith("[error")) {
-                        transcriptEl.textContent += " " + event.data;
-                    }
-                };
-
-                socket.onclose = () => {
-                    status.textContent = "WebSocket disconnected";
-                };
-            };
-
-            stopBtn.onclick = () => {
-                if (processor) processor.disconnect();
-                if (audioCtx) audioCtx.close();
-                if (audioStream)
-                    audioStream.getTracks().forEach((track) => track.stop());
-                if (socket && socket.readyState === WebSocket.OPEN)
-                    socket.close();
-                if (animationId) cancelAnimationFrame(animationId);
-
-                startBtn.disabled = false;
-                stopBtn.disabled = true;
-                status.textContent = "Stopped";
-            };
-        </script>
+        <script src="/static/assets/script.js"></script>
     </body>
 </html>
